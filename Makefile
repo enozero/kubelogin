@@ -8,7 +8,7 @@ GITHUB_REPO_HOST_AND_PATH := github.com/$(GITHUB_REPO_OWNER)/$(GITHUB_REPO_NAME)
 IMAGE_NAME := gitlab-registry.nordstrom.com/k8s/platform-bootstrap/kubelogin
 BUILD := build
 CURRENT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
-CURRENT_TAG := v0.0.6d
+CURRENT_TAG := v0.0.7
 GOLANG_TOOLCHAIN_VERSION := 1.9.1
 
 .PHONY: image/build image/push
