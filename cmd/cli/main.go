@@ -67,7 +67,7 @@ var (
     kubelogin config --alias=example --server-url=https://kubelogin.example.com --kubectl-user=example_oidc
 
   Use an alias:
-    kubelogin login example --port=30000`
+    kubelogin login --port=30000 example`
 )
 
 //AliasConfig contains the structure of what's in the config file
@@ -251,13 +251,17 @@ func generateURLAndListenForServerResponse(app app) {
 	time.Sleep(1 * time.Second)
 }
 
-func setFlags(command *flag.FlagSet, loginCmd bool) {
-	if !loginCmd {
-		command.StringVar(&aliasFlag, "alias", "default", "alias name in the config file, used for an easy login")
-	}
+func setCommonFlags(command *flag.FlagSet) {
 	command.StringVar(&userFlag, "kubectl-user", "kubelogin_user", "in kubectl config, username used to store credentials")
 	command.StringVar(&kubeloginServerBaseURL, "server-url", "", "base URL of the kubelogin server, ex: https://kubelogin.example.com")
+}
+func setLoginFlags(command *flag.FlagSet) {
+	setCommonFlags(command)
 	command.StringVar(&port, "port", "", "port to open for the server to receive the token")
+}
+func setConfigFlags(command *flag.FlagSet) {
+	setCommonFlags(command)
+	command.StringVar(&aliasFlag, "alias", "default", "alias name in the config file, used for an easy login")
 }
 func (app *app) getConfigSettings(alias string) error {
 	yamlFile, err := ioutil.ReadFile(app.filenameWithPath)
@@ -370,9 +374,9 @@ func (app *app) configureFile(kubeloginrcAlias string, loginServerURL *url.URL, 
 func main() {
 	var app app
 	loginCommmand := flag.NewFlagSet("login", flag.ExitOnError)
-	setFlags(loginCommmand, true)
+	setLoginFlags(loginCommmand)
 	configCommand := flag.NewFlagSet("config", flag.ExitOnError)
-	setFlags(configCommand, false)
+	setConfigFlags(configCommand)
 	user, err := user.Current()
 	if err != nil {
 		log.Fatalf("Could not determine current user of this system. Err: %v", err)
@@ -385,15 +389,16 @@ func main() {
 	}
 	switch os.Args[1] {
 	case "login":
+		_ = loginCommmand.Parse(os.Args[2:])
 		app.kubeloginPort = port
-		if !strings.HasPrefix(os.Args[2], "--") {
+		possibleAlias := os.Args[len(os.Args) - 1]
+		if !strings.HasPrefix(possibleAlias, "--") {
 			//use alias to extract needed information
-			if err := app.getConfigSettings(os.Args[2]); err != nil {
+			if err := app.getConfigSettings(possibleAlias); err != nil {
 				log.Fatal(err)
 			}
 			generateURLAndListenForServerResponse(app)
 		} else {
-			_ = loginCommmand.Parse(os.Args[2:])
 			if loginCommmand.Parsed() {
 				if kubeloginServerBaseURL == "" {
 					log.Fatal("--server-url must be set!")
