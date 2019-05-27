@@ -27,6 +27,7 @@ type app struct {
 	kubectlConfigPath string
 	kubeloginAlias    string
 	kubeloginServer   string
+	kubeloginPort     string
 }
 
 type kubeYAML struct {
@@ -55,17 +56,18 @@ var (
 	aliasFlag              string
 	userFlag               string
 	kubeloginServerBaseURL string
+	port                   string
 	doneChannel            chan bool
 	usageMessage           = `Kubelogin Usage:
-  
+
   One time login:
-    kubelogin login --server-url=https://kubelogin.example.com --kubectl-user=user
-    
+    kubelogin login --server-url=https://kubelogin.example.com --kubectl-user=user --port=30000
+
   Configure an alias (shortcut):
     kubelogin config --alias=example --server-url=https://kubelogin.example.com --kubectl-user=example_oidc
-    
+
   Use an alias:
-    kubelogin login example`
+    kubelogin login example --port=30000`
 )
 
 //AliasConfig contains the structure of what's in the config file
@@ -188,10 +190,14 @@ func (app *app) configureKubectl(jwt string) error {
 }
 
 func (app *app) generateAuthURL() (string, string, error) {
-	portNum, err := findFreePort()
-	if err != nil {
-		log.Print("err, could not find an open port")
-		return "", "", err
+	var portNum = app.kubeloginPort
+	if len(portNum) == 0 {
+		freePortNum, err := findFreePort()
+		if err != nil {
+			log.Print("err, could not find an open port")
+			return "", "", err
+		}
+		portNum = freePortNum
 	}
 
 	loginURL := fmt.Sprintf("%s/login?port=%s", app.kubeloginServer, portNum)
@@ -251,6 +257,7 @@ func setFlags(command *flag.FlagSet, loginCmd bool) {
 	}
 	command.StringVar(&userFlag, "kubectl-user", "kubelogin_user", "in kubectl config, username used to store credentials")
 	command.StringVar(&kubeloginServerBaseURL, "server-url", "", "base URL of the kubelogin server, ex: https://kubelogin.example.com")
+	command.StringVar(&port, "port", "", "port to open for the server to receive the token")
 }
 func (app *app) getConfigSettings(alias string) error {
 	yamlFile, err := ioutil.ReadFile(app.filenameWithPath)
@@ -378,6 +385,7 @@ func main() {
 	}
 	switch os.Args[1] {
 	case "login":
+		app.kubeloginPort = port
 		if !strings.HasPrefix(os.Args[2], "--") {
 			//use alias to extract needed information
 			if err := app.getConfigSettings(os.Args[2]); err != nil {
